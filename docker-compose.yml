@@ -1,5 +1,5 @@
 services:
-  databaseengine:
+  dbcsv-server:
     image: databaseengine
     build:
       context: .
@@ -7,7 +7,7 @@ services:
     ports:
       - 80:80
 
-  dbapi2:
+  dbcsv-client:
     image: dbapi2
     build:
       context: .
