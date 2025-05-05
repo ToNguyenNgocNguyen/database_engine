@@ -11,4 +11,3 @@ wheels/
 .pytest_cache
 .vscode
 dbcsv/engine/storage/schema3
-example.py
