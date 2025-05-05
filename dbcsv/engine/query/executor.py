@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import date, datetime
 from typing import Any, Dict, Generator, List
 
 from dbcsv.engine.relational.datatype import DBTypeObject
@@ -25,10 +26,18 @@ class SelectExecutor:
 
     def format_row(self, row: Dict[str, Any], select_columns: List[str]) -> str:
         if select_columns == ["*"]:
-            return json.dumps(list(row.values()))
-        else:
-            projected = [row[col] for col in select_columns if col in row]
+            projected = [self.convert_value(v) for v in row.values()]
             return json.dumps(projected)
+        else:
+            projected = [
+                self.convert_value(row[col]) for col in select_columns if col in row
+            ]
+            return json.dumps(projected)
+
+    def convert_value(self, val: Any) -> Any:
+        if isinstance(val, (date, datetime)):
+            return val.isoformat()
+        return val
 
     def evaluate_condition(self, expr: Dict[str, Any], row: Dict[str, Any]) -> bool:
         if expr["op"] in ("AND", "OR"):
@@ -58,6 +67,10 @@ class SelectExecutor:
             return operand[1:-1]  # strip quotes
         elif self.is_numeric_literal(operand):
             return self.cast_number(operand)
+        elif operand.upper() == "TRUE":
+            return 1
+        elif operand.upper() == "FALSE":
+            return 0
         elif operand in row:
             self._column_type = self.columns[operand]
             return row[operand]

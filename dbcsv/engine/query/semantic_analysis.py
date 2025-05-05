@@ -31,7 +31,9 @@ class SemanticAnalyzer:
 
     def _is_literal(self, operand: str) -> bool:
         return bool(
-            re.match(r"^\d+(\.\d+)?$", operand) or re.match(r"^'[^']*'$", operand)
+            re.match(r"^\d+(\.\d+)?$", operand)  # Numeric literals
+            or re.match(r"^'[^']*'$", operand)  # String literals
+            or operand.upper() in ("TRUE", "FALSE")  # Boolean literals
         )
 
     def _check_expression(self, expr, table):

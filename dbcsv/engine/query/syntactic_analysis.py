@@ -85,13 +85,6 @@ class SQLParser:
             raise SyntaxException(f"Expected operator, got '{op}'")
         return self.consume()
 
-    # def parse_value(self) -> str:
-    #     token = self.current_token()
-    #     if re.match(r"^\d+(\.\d+)?$", token) or re.match(r"^'[^']*'$", token):
-    #         return self.consume()
-    #     else:
-    #         raise SyntaxException(f"Expected value, got '{token}'")
-
     def parse_identifier(self) -> str:
         token = self.current_token()
         if re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", token):

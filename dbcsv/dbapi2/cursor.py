@@ -39,15 +39,20 @@ class Cursor:
         self._ensure_open()
         self._ensure_token()
 
-        self._stream_context = self.connection.client.stream(
-            method="POST",
-            url=f"{self.connection.base_url}/query/sql",
-            json={"sql_statement": query, "schema": self.connection.schema},
-            headers={"Authorization": f"Bearer {self.connection.token}"},
-        )
-        self._response = self._stream_context.__enter__()  # enter manually
-        self._response.raise_for_status()
-        self._results = self._response.iter_bytes()
+        try:
+            self._stream_context = self.connection.client.stream(
+                method="POST",
+                url=f"{self.connection.base_url}/query/sql",
+                json={"sql_statement": query, "schema": self.connection.schema},
+                headers={"Authorization": f"Bearer {self.connection.token}"},
+            )
+            self._response = self._stream_context.__enter__()  # enter manually
+            self._response.raise_for_status()
+            self._results = self._response.iter_bytes()
+        except Exception:
+            content = self._response.read()
+            error_message = content.decode("utf-8", errors="replace")
+            raise ProgrammingError(error_message)
 
     def fetchone(self) -> List[Any] | None:
         self._ensure_open()
@@ -89,6 +94,7 @@ class Cursor:
             if chunk.strip():
                 results.append(json.loads(chunk.decode()))
 
+        self.rowcount = len(results)
         return results
 
     def close(self):
