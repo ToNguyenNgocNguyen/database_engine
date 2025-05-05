@@ -21,24 +21,24 @@ class SQLLexer:
             ("SKIP", r"\s+"),  # Skip whitespace
             ("MISMATCH", r"."),  # Any other character
         ]
-        self.KEYWORDS = {
-            "SELECT",
-            "FROM",
-            "WHERE",
-            "AND",
-            "OR",
-            "JOIN",
-            "ON",
-            "AS",
-            "GROUP",
-            "BY",
-            "ORDER",
-            "HAVING",
-            "LIMIT",
-            "OFFSET",
-        }
 
-        # Compile the regex
+        # Use frozenset for faster keyword lookup
+        self.KEYWORDS = frozenset(
+            {
+                "SELECT",
+                "FROM",
+                "WHERE",
+                "AND",
+                "OR",
+            }
+        )
+
+        # Precompile individual regex patterns for faster matching
+        self.re_number = re.compile(r"\b\d+(\.\d+)?\b")
+        self.re_string = re.compile(r"'[^']*'")
+        self.re_ident = re.compile(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b")
+
+        # Compile the main token regex
         tok_regex = "|".join(
             f"(?P<{name}>{pattern})" for name, pattern in self.token_specification
         )

@@ -20,14 +20,9 @@ cur = conn.cursor()
 
 # cur.close()
 
-cur.execute(
-    "SELECT * FROM student WHERE birth_date < '2000-01-01' AND (TRUE > student_id OR student_id > 1) or gpa > 3.5"
-)
-for row in cur.fetchmany(4):
-    print(row)
-
-for row in cur.fetchmany(4):
-    print(row)
+cur.execute("SELECT * FROM peoplesmall WHERE city = 'Chicago' AND age < 30 OR age > 20")
+print(cur.fetchall())
+print(cur.rowcount)
 
 cur.close()
 conn.close()

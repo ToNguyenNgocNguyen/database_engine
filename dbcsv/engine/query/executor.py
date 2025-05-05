@@ -6,6 +6,9 @@ from typing import Any, Dict, Generator, List
 from dbcsv.engine.relational.datatype import DBTypeObject
 from dbcsv.engine.relational.schema import Schema
 
+# Precompiled regex
+RE_NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
+
 
 class SelectExecutor:
     def __init__(self, schema: Schema):
@@ -21,76 +24,83 @@ class SelectExecutor:
         data_gen = table.load_data_gen()
 
         for row in data_gen:
-            if where_clause is None or self.evaluate_condition(where_clause, row):
+            if not where_clause or self.evaluate_condition(where_clause, row):
                 yield self.format_row(row, select_columns)
 
     def format_row(self, row: Dict[str, Any], select_columns: List[str]) -> str:
         if select_columns == ["*"]:
             projected = [self.convert_value(v) for v in row.values()]
-            return json.dumps(projected)
         else:
             projected = [
                 self.convert_value(row[col]) for col in select_columns if col in row
             ]
-            return json.dumps(projected)
+        return json.dumps(projected)
 
-    def convert_value(self, val: Any) -> Any:
-        if isinstance(val, (date, datetime)):
-            return val.isoformat()
-        return val
+    @staticmethod
+    def convert_value(val: Any) -> Any:
+        return val.isoformat() if isinstance(val, (date, datetime)) else val
 
     def evaluate_condition(self, expr: Dict[str, Any], row: Dict[str, Any]) -> bool:
-        if expr["op"] in ("AND", "OR"):
-            left = self.evaluate_condition(expr["left"], row)
-            right = self.evaluate_condition(expr["right"], row)
-            return left and right if expr["op"] == "AND" else left or right
+        op = expr["op"]
+        if op == "AND":
+            return self.evaluate_condition(
+                expr["left"], row
+            ) and self.evaluate_condition(expr["right"], row)
+        elif op == "OR":
+            return self.evaluate_condition(
+                expr["left"], row
+            ) or self.evaluate_condition(expr["right"], row)
 
-        # Leaf condition: {left, op, right}
-        left_val = self.resolve_operand(expr["left"], row)
-        right_val = self.resolve_operand(expr["right"], row)
+        # Leaf condition
+        left_val, left_type = self.resolve_operand(expr["left"], row)
+        right_val, right_type = self.resolve_operand(expr["right"], row)
 
-        try:
-            left_val = DBTypeObject.convert_datatype(left_val, self._column_type)
-        except Exception:
-            pass
+        # Avoid unnecessary conversions if types already match or are literals
+        if left_type and not isinstance(left_val, DBTypeObject):
+            try:
+                left_val = DBTypeObject.convert_datatype(left_val, left_type)
+            except Exception:
+                pass
 
-        try:
-            right_val = DBTypeObject.convert_datatype(right_val, self._column_type)
-        except Exception:
-            pass
+        if right_type and not isinstance(right_val, DBTypeObject):
+            try:
+                right_val = DBTypeObject.convert_datatype(right_val, right_type)
+            except Exception:
+                pass
 
-        return self.compare(left_val, expr["op"], right_val)
+        return self.compare(left_val, op, right_val)
 
-    def resolve_operand(self, operand: str, row: Dict[str, Any]) -> Any:
-        # Operand may be a literal or a column
+    def resolve_operand(
+        self, operand: str, row: Dict[str, Any]
+    ) -> tuple[Any, str | None]:
+        operand_uc = operand.upper()
         if self.is_string_literal(operand):
-            return operand[1:-1]  # strip quotes
+            return operand[1:-1], None
         elif self.is_numeric_literal(operand):
-            return self.cast_number(operand)
-        elif operand.upper() == "TRUE":
-            return 1
-        elif operand.upper() == "FALSE":
-            return 0
+            return self.cast_number(operand), None
+        elif operand_uc == "TRUE":
+            return 1, None
+        elif operand_uc == "FALSE":
+            return 0, None
         elif operand in row:
-            self._column_type = self.columns[operand]
-            return row[operand]
+            return row[operand], self.columns.get(operand)
         else:
-            # If not a column and not a literal, treat as string (e.g., bareword constant like TRUE)
-            return operand
+            return operand, None
 
-    def is_string_literal(self, value: str) -> bool:
+    @staticmethod
+    def is_string_literal(value: str) -> bool:
         return value.startswith("'") and value.endswith("'")
 
-    def is_numeric_literal(self, value: str) -> bool:
-        return re.match(r"^-?\d+(\.\d+)?$", value) is not None
+    @staticmethod
+    def is_numeric_literal(value: str) -> bool:
+        return RE_NUMERIC_LITERAL.match(value) is not None
 
-    def cast_number(self, value: str) -> Any:
-        try:
-            return int(value)
-        except ValueError:
-            return float(value)
+    @staticmethod
+    def cast_number(value: str) -> Any:
+        return int(value) if "." not in value else float(value)
 
-    def compare(self, left: Any, op: str, right: Any) -> bool:
+    @staticmethod
+    def compare(left: Any, op: str, right: Any) -> bool:
         if op == "=":
             return left == right
         elif op in ("!=", "<>"):
@@ -105,28 +115,3 @@ class SelectExecutor:
             return left >= right
         else:
             raise ValueError(f"Unknown operator: {op}")
-
-
-if __name__ == "__main__":
-    from dbcsv.engine.query.lexical_analysis import SQLLexer
-    from dbcsv.engine.query.semantic_analysis import SemanticAnalyzer
-    from dbcsv.engine.query.syntactic_analysis import SQLParser
-    from dbcsv.engine.relational import get_schema
-
-    sql = "SELECT * FROM table2 WHERE age > 1 AND 1 = 1"
-
-    # Lex + Parse
-    lexer = SQLLexer()
-    tokens = lexer.tokenize(sql)
-    parser = SQLParser(tokens)
-    parsed = parser.parse()
-
-    # Schema + Semantic analysis
-    schema = get_schema("schema1")
-    analyzer = SemanticAnalyzer(schema)
-    analyzer.analyze(parsed)
-
-    # Execute
-    executor = SelectExecutor(schema)
-    for row in executor.execute(parsed):
-        print(row)
