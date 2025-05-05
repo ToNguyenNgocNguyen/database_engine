@@ -3,6 +3,12 @@ services:
     image: databaseengine
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: ./dbcsv/engine/Dockerfile
     ports:
       - 80:80
+
+  dbapi2:
+    image: dbapi2
+    build:
+      context: .
+      dockerfile: ./dbcsv/dbapi2/Dockerfile
