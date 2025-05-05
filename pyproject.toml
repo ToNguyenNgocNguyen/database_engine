@@ -1,0 +1,30 @@
+[project]
+name = "dbcsv"
+version = "0.1.0"
+description = "A FastAPI-based engine for database interaction"
+readme = "README.md"
+requires-python = ">=3.10"
+
+
+dependencies = [
+    "fastapi>=0.115.1",
+    "httpx>=0.28.1",
+    "pyjwt>=2.10.1",
+    "python-dotenv>=1.1.0",
+    "python-multipart>=0.0.20",
+    "pyyaml>=6.0.2",
+    "uvicorn>=0.34.1",
+]
+
+
+[dependency-groups]
+dev = ["pytest>=8.3.5"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dbcsv*"]
+
+
+[build-system]
+requires = ["setuptools>=77.0.0"]
+build-backend = "setuptools.build_meta"
