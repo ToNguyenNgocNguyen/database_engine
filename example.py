@@ -1,6 +1,6 @@
 from dbcsv import dbapi2
 
-conn = dbapi2.connect("http://127.0.0.1/schema3", user="johndoe", password="secret")
+conn = dbapi2.connect("http://127.0.0.1/testing", user="johndoe", password="secret")
 cur = conn.cursor()
 
 # cur.execute(
@@ -20,7 +20,7 @@ cur = conn.cursor()
 
 # cur.close()
 
-cur.execute("SELECT * FROM peoplesmall WHERE city = 'Chicago' AND age < 30 OR age > 20")
+cur.execute("SELECT * FROM mock_data WHERE col_7 > 70")
 print(cur.fetchall())
 print(cur.rowcount)
 
