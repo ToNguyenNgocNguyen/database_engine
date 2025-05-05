@@ -20,7 +20,7 @@ cur = conn.cursor()
 
 # cur.close()
 
-cur.execute("SELECT * FROM mock_data WHERE col_7 > 70")
+cur.execute("SELECT * FROM mock_data WHERE col_0 > 50 and col_1 < 50")
 print(cur.fetchall())
 print(cur.rowcount)
 

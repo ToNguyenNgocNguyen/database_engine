@@ -24,8 +24,11 @@ class SelectExecutor:
         data_gen = table.load_data_gen()
 
         for row in data_gen:
-            if not where_clause or self.evaluate_condition(where_clause, row):
-                yield self.format_row(row, select_columns)
+            try:
+                if not where_clause or self.evaluate_condition(where_clause, row):
+                    yield self.format_row(row, select_columns)
+            except Exception:
+                continue  # Skip row on any evaluation error
 
     def format_row(self, row: Dict[str, Any], select_columns: List[str]) -> str:
         if select_columns == ["*"]:
@@ -41,34 +44,40 @@ class SelectExecutor:
         return val.isoformat() if isinstance(val, (date, datetime)) else val
 
     def evaluate_condition(self, expr: Dict[str, Any], row: Dict[str, Any]) -> bool:
-        op = expr["op"]
-        if op == "AND":
-            return self.evaluate_condition(
-                expr["left"], row
-            ) and self.evaluate_condition(expr["right"], row)
-        elif op == "OR":
-            return self.evaluate_condition(
-                expr["left"], row
-            ) or self.evaluate_condition(expr["right"], row)
+        try:
+            op = expr["op"]
+            if op == "AND":
+                return self.evaluate_condition(
+                    expr["left"], row
+                ) and self.evaluate_condition(expr["right"], row)
+            elif op == "OR":
+                return self.evaluate_condition(
+                    expr["left"], row
+                ) or self.evaluate_condition(expr["right"], row)
 
-        # Leaf condition
-        left_val, left_type = self.resolve_operand(expr["left"], row)
-        right_val, right_type = self.resolve_operand(expr["right"], row)
+            # Leaf condition
+            left_val, left_type = self.resolve_operand(expr["left"], row)
+            right_val, right_type = self.resolve_operand(expr["right"], row)
 
-        # Avoid unnecessary conversions if types already match or are literals
-        if left_type and not isinstance(left_val, DBTypeObject):
-            try:
-                left_val = DBTypeObject.convert_datatype(left_val, left_type)
-            except Exception:
-                pass
+            if left_val is None or right_val is None:
+                return False  # Skip row if operand not resolvable
 
-        if right_type and not isinstance(right_val, DBTypeObject):
-            try:
-                right_val = DBTypeObject.convert_datatype(right_val, right_type)
-            except Exception:
-                pass
+            if left_type and not isinstance(left_val, DBTypeObject):
+                try:
+                    left_val = DBTypeObject.convert_datatype(left_val, left_type)
+                except Exception:
+                    pass
 
-        return self.compare(left_val, op, right_val)
+            if right_type and not isinstance(right_val, DBTypeObject):
+                try:
+                    right_val = DBTypeObject.convert_datatype(right_val, right_type)
+                except Exception:
+                    pass
+
+            return self.compare(left_val, op, right_val)
+
+        except Exception:
+            return False  # Skip row on any error
 
     def resolve_operand(
         self, operand: str, row: Dict[str, Any]
@@ -85,7 +94,7 @@ class SelectExecutor:
         elif operand in row:
             return row[operand], self.columns.get(operand)
         else:
-            return operand, None
+            return None, None  # Unknown column or invalid operand
 
     @staticmethod
     def is_string_literal(value: str) -> bool:
